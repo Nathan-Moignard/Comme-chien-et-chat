@@ -7,42 +7,73 @@
  */
 
 import React, { Component } from 'react';
+import RNFetchBlob from 'rn-fetch-blob';
 import {
   View,
   Text,
   Image,
   ActivityIndicator,
-  StyleSheet,
-  Button
+  Button,
+  PermissionsAndroid,
+  Alert
 } from 'react-native';
 
-const styles = StyleSheet.create({
-  container: {
-    width: "100%",
-    height: "100%",
-    alignItems: "center",
-    flex: 1,
-  },
-  title: {
-    textAlign: "center",
-    textAlignVertical: "center",
-    height: "10%"
-  },
-  refreshButton: {
-    height: "10%",
-    width: "100%"
-  }
-});
+const TheDogApi_URL = "https://api.thedogapi.com/v1/images/search";
+const TheCatApi_URL = "https://api.thecatapi.com/v1/images/search";
+var currentURL = "";
+var homeTitle = "";
+
+import { home } from './src/css/home'
 
 export default class App extends Component {
 
   state = {
+      title: "",
       data: [],
       isLoading: true
     };
 
-  loadImage = () => {
-    fetch("https://api.thedogapi.com/v1/images/search")
+    downloadImage = () => {
+      let dirs = RNFetchBlob.fs.dirs
+      console.log(dirs.DownloadDir + "/" + this.state.data[0].id + '.' + this.state.data[0].url.split(".")[3])
+      RNFetchBlob
+      .config({
+        // response data will be saved to this path if it has access right.
+        path : dirs.DownloadDir + "test.jpg"
+      })
+      .fetch('GET', currentURL)
+      .then((res) => {
+        // the path should be dirs.DocumentDir + 'path-to-file.anything'
+        console.log('The file saved to ', res.path())
+      })
+    }
+
+    async downloadFile() {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          {
+            title: 'Storage Permission',
+            message: 'App needs access to memory to download the file ',
+          },
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          this.downloadImage();
+        } else {
+          Alert.alert(
+            'Permission Denied!',
+            'You need to give storage permission to download the file',
+          );
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    }
+
+  loadImage() {
+    if (currentURL == "")
+      return ;
+    fetch(currentURL)
       .then((response) => response.json())
       .then((json) => {
         this.setState({data: json});
@@ -51,6 +82,7 @@ export default class App extends Component {
       .finally(() => {
         if (this.state.isLoading == true)
           this.setState({ isLoading: false });
+        this.downloadFile();
       });
   }
 
@@ -58,13 +90,33 @@ export default class App extends Component {
     this.loadImage();
   }
 
+  loadDog = () => {
+    this.title = "Dog"
+    currentURL = TheDogApi_URL;
+    this.loadImage();
+  }
+
+  loadCat = () => {
+    this.title = "Cat"
+    currentURL = TheCatApi_URL;
+    this.loadImage();
+  }
+
   render() {
 
-    const { data, isLoading } = this.state;
+    const { data, isLoading, homeTitle } = this.state;
 
     return (
-      <View style = {styles.container}>
-        <Text style = {styles.title}>Here is a random DOGGO !</Text>
+      <View style = {home.container}>
+        <Text style = {home.title}>{this.title}</Text>
+        <View>
+          <Button
+            title = "Dog"
+            onPress = {this.loadDog}></Button>
+          <Button
+            title = "Cat"
+            onPress = {this.downloadFile}></Button>
+        </View>
         {isLoading ? <ActivityIndicator/> : (
           <Image
             resizeMethod = "auto"
@@ -72,10 +124,6 @@ export default class App extends Component {
             style={{height: "80%", width: "100%"}}
             source = {{uri : data[0].url}}></Image>
         )}
-        <Button
-        style={styles.refreshButton}
-        title = "Refresh"
-        onPress = {this.loadImage}></Button>
       </View>
     )
   }
